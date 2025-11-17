@@ -2,18 +2,17 @@
 
 ## Equipo de Desarrollo
 
-|       Nombre       | Rol | Github |
-
-| ================== | ====== | ====== |
-
-| Erick | Implementación Secuencial | 
-
-| Fernando Zacarias | Medición de Rendimiento | 
-
-| Richard Carrasco | Documentación | 
+| Nombre | Rol | GitHub |
+|--------|-----|--------|
+| [Erick Daniel] | Implementación Secuencial | [@](https://github.com/) |
+| [Fernando Zacarías] | Medición de Rendimiento | [@](https://github.com/) |
+| [Patrick] | Documentación (Introducción) | [@](https://github.com/) |
+| [Richard Carrasco] | Fundamento Teórico e Integración | [@RichiRichon](https://github.com/RichiRichon) |
 
 **Universidad:** Universidad Nacional Mayor de San Marcos
+
 **Curso:** Programación Paralela
+
 **Fecha:** 17 Noviembre 2025
 
 ---
@@ -420,8 +419,8 @@ cat output.txt
 ---
 
 **Última actualización:** [17/11/2025]  
-**Contacto:** [erick.quispe@unmsm.edu.pe]
-              [patrick.coronel@unmsm.edu.pe]
-              [richard.carrasco@unmsm.edu.pe]
+**Contacto:** [erick.quispe@unmsm.edu.pe],
+              [patrick.coronel@unmsm.edu.pe],
+              [fernando.zacarias@unmsm.edu.pe],
               [richard.carrasco@unmsm.edu.pe]
 
