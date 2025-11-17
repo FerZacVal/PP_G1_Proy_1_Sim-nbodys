@@ -3,10 +3,14 @@
 ## Equipo de Desarrollo
 
 |       Nombre       | Rol | Github |
+
 | ================== | ====== | ====== |
-| Erick
-| Fernando Zacarias 
-| Richard Carrasco
+
+| Erick | Implementación Secuencial | 
+
+| Fernando Zacarias | Medición de Rendimiento | 
+
+| Richard Carrasco | Documentación | 
 
 **Universidad:** Universidad Nacional Mayor de San Marcos
 **Curso:** Programación Paralela
@@ -16,7 +20,7 @@
 
 ## 1. Resumen (Abstract)
 
-El problema de N-Body consiste en simular la evolución temporal de un sistema de &N& cuerpos bajo la influencia de la fuerza gravitacional mutua, regida por la Ley de Gravitación Universal de Newton. Este problema tiene aplicaciones en astrofísica, dinámica molecular y simulaciones de fluidos. El principal desafio computacional radica en el cálculo de las feurzas de interacción entre todos los pares de cuerpos, lo cual tiene una complejidad de &O(N^2)& por cada paso de tiempo.
+El problema de N-Body consiste en simular la evolución temporal de un sistema de &N& cuerpos bajo la influencia de la fuerza gravitacional mutua, regida por la Ley de Gravitación Universal de Newton. Este problema tiene aplicaciones en astrofísica, dinámica molecular y simulaciones de fluidos. El principal desafio computacional radica en el cálculo de las feurzas de interacción entre todos los pares de cuerpos, lo cual tiene una complejidad de &O(N²)& por cada paso de tiempo.
 
 En este proyecto, implementamos una simulación N-Body utilizado el Método de Euler para la integración numérica de las ecuaciones de movimiento. La primera fase del proyecto se enfocó en desarrollar e implemtnar una **versión secuencial completa y funcional** del alogritmo en C/C++. Esta versión sirve como referencia para validar la correción de futuras implementaciones paralelas.
 
@@ -33,3 +37,8 @@ En las siguientes fases del proyecto se implementará la paralelización utiliza
 ## 2. Introducción
 
 ### 2.1. Contexto del Problema
+
+El problema de N-Body es un problema clásico en física computacional que consisten en predecir el movimiento de un conjunto de objetos celestes que interactúan gravitacionalmente. Este problema fue planteado originalmente por Isaac Newton en el siglo XVII para describir el movimiento de los planetas del sistema solar.
+
+Aunque para dos cuerpos existe una solución analítica (el problema de Kepler), para tres o más cuerpos no existe una solución general en forma cerrada. Por lo tanto, es necesario recurrir a métodos numéricos para aproximar la evolución temporal del sistema.
+
