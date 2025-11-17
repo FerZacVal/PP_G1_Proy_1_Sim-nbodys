@@ -4,9 +4,9 @@
 
 | Nombre | Rol | GitHub |
 |--------|-----|--------|
-| [Erick Daniel] | Implementación Secuencial | [@](https://github.com/) |
-| [Fernando Zacarías] | Medición de Rendimiento | [@](https://github.com/) |
-| [Patrick] | Documentación (Introducción) | [@](https://github.com/) |
+| [Erick Quispe] | Implementación Secuencial | [@Danerick15](https://github.com/Danerick15) |
+| [Fernando Zacarías] | Medición de Rendimiento | [@FerZacVal](https://github.com/FerZacVal) |
+| [Patrick Coronel] | Documentación (Introducción) | [@PatrickCR1226](https://github.com/PatrickCR1226) |
 | [Richard Carrasco] | Fundamento Teórico e Integración | [@RichiRichon](https://github.com/RichiRichon) |
 
 **Universidad:** Universidad Nacional Mayor de San Marcos
@@ -371,8 +371,8 @@ La versión secuencial sirve como:
 ## Estructura del Repositorio
 
 ```
-NBody-OpenMP/
-├── README.md                    (Este archivo)
+PP_G1_Proy_1_Sim-nbodys/
+├── README.md                    
 ├── src/
 │   ├── nbody_secuencial.c      (Implementación secuencial - Entrega 1)
 │   ├── nbody_parallel.c        (Implementación paralela - Semana 2)
