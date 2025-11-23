@@ -2,6 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <random>
+#include <omp.h>
+
 
 NBodySim::NBodySim(int N, double dt, double G)
     : N_bodies(N), delta_t(dt), G_const(G) {
@@ -99,4 +101,69 @@ void NBodySim::save_final_state(const std::string& filename) {
             << b.velocity.x << "," << b.velocity.y << "," << b.velocity.z << "\n";
     }
     ofs.close();
+}
+
+// Función principal de la simulación paralela con OpenMP
+void NBodySim::update_parallel_omp(int steps) {
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        std::cout << "[OMP] Hilos activos: " << omp_get_num_threads() << "\n";
+    }
+
+    for (int t = 0; t < steps; ++t) {
+
+        // 1. Buffer local por hilo para acumulación de fuerzas
+        std::vector<Vector3> force_buffer(N_bodies);
+
+        #pragma omp parallel
+        {
+            // Cada hilo tiene su propio buffer privado
+            std::vector<Vector3> local_force(N_bodies, Vector3(0,0,0));
+
+            #pragma omp for schedule(dynamic)
+            for (int i = 0; i < N_bodies; ++i) {
+                for (int j = i + 1; j < N_bodies; ++j) {
+
+                    Vector3 r_vec = bodies[j].position - bodies[i].position;
+                    double r_sq = r_vec.magnitude_sq();
+                    const double EPSILON = 1e-9;
+                    if (r_sq < EPSILON) continue;
+
+                    double r = std::sqrt(r_sq);
+                    double F_mag = G_const * bodies[i].mass * bodies[j].mass / r_sq;
+                    Vector3 F_vec = r_vec * (F_mag / r);
+
+                    // Cada hilo acumula sus fuerzas en su propio buffer
+                    local_force[i] = local_force[i] + F_vec;
+                    local_force[j] = local_force[j] - F_vec;
+                }
+            }
+
+            // Reducción paralela: combinar fuerzas locales hacia el buffer global
+            #pragma omp critical
+            {
+                for (int i = 0; i < N_bodies; ++i) {
+                    force_buffer[i] = force_buffer[i] + local_force[i];
+                }
+            }
+        }
+
+        // Copiar las fuerzas acumuladas al arreglo principal
+        for (int i = 0; i < N_bodies; ++i) {
+            bodies[i].force = force_buffer[i];
+        }
+
+        // 3. Integración paralela
+        #pragma omp parallel for
+        for (int i = 0; i < N_bodies; ++i) {
+
+            Body& b = bodies[i];
+            Vector3 acceleration = b.force / b.mass;
+
+            b.velocity = b.velocity + acceleration * delta_t;
+            b.position = b.position + b.velocity * delta_t;
+        }
+    }
 }

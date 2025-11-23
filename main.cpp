@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include "NBodySim.h"
+#include <omp.h>
 
 // Parámetros Globales (Hardcodeados para la Semana 1) [cite: 50]
 const int N_BODIES = 1000;      // N: Número de cuerpos
@@ -29,6 +30,30 @@ int main() {
     // 4. Guardar el estado final (Requisito de la Semana 1) [cite: 65, 54]
     sim.save_final_state("final_state_sequential.csv");
     std::cout << "Estado final guardado en: final_state_sequential.csv\n";
+
+
+    // Prueba paralela
+    omp_set_num_threads(4);
+
+    std::cout << "\nEjecutando en paralelo con "
+          << omp_get_max_threads() << " threads...\n";
+
+    NBodySim sim2(N_BODIES, DELTA_T, G_CONST);
+    sim2.initialize_bodies();
+
+    auto start2 = std::chrono::high_resolution_clock::now();
+    sim2.update_parallel_omp(STEPS);
+    auto end2 = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> duration2 = end2 - start2;
+
+    std::cout << "Tiempo Paralelo: " << duration2.count() << " segundos.\n";
+
+    sim2.save_final_state("final_state_parallel.csv");
+    std::cout << "Estado final paralelo guardado en: final_state_parallel.csv\n";
+
+    //Estoy usando VSCode: g++ main.cpp src/NBodySim.cpp src/Body.cpp src/Vector3.cpp -I include -o simnbody.exe -std=c++17 -fopenmp
+    // ./simnbody.exe
 
     return 0;
 }

@@ -11,6 +11,7 @@ public:
 
     // Métodos para la simulación
     void update_sequential(int steps); // El foco de la Semana 1
+    void update_parallel_omp(int steps);
 
     // Inicialización de cuerpos (Hardcodeado o aleatorio, según el requisito de Input)
     void initialize_bodies();
