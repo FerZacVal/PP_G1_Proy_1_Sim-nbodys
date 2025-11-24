@@ -3,13 +3,12 @@ project(NBodyProject)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Incluir carpeta de headers
 include_directories(include)
 
-# Buscar OpenMP
-find_package(OpenMP REQUIRED)
+# Flags globales de compilación y enlace
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp")
 
-# Archivos fuente
 add_executable(NBodyProject
         main.cpp
         src/Vector3.cpp
@@ -17,7 +16,7 @@ add_executable(NBodyProject
         src/NBodySim.cpp
 )
 
-# Enlazar OpenMP
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(NBodyProject PUBLIC OpenMP::OpenMP_CXX)
-endif()
+message(STATUS "========================================")
+message(STATUS "Compilando con: ${CMAKE_CXX_FLAGS}")
+message(STATUS "Enlazando con: ${CMAKE_EXE_LINKER_FLAGS}")
+message(STATUS "========================================")
