@@ -1,18 +1,3 @@
-# Simulación de Cuerpos N-Body Paralela
-
-## Equipo de Desarrollo
-
-| Nombre | Rol | GitHub |
-|--------|-----|--------|
-| [Erick Quispe] | Implementación Secuencial | [@Danerick15](https://github.com/Danerick15) |
-| [Fernando Zacarías] | Medición de Rendimiento | [@FerZacVal](https://github.com/FerZacVal) |
-| [Patrick Coronel] | Documentación (Introducción) | [@PatrickCR1226](https://github.com/PatrickCR1226) |
-| [Richard Carrasco] | Fundamento Teórico e Integración | [@RichiRichon](https://github.com/RichiRichon) |
-
-**Universidad:** Universidad Nacional Mayor de San Marcos
-
-**Curso:** Programación Paralela
-
 **Fecha:** 17 Noviembre 2025
 
 ---
@@ -268,23 +253,29 @@ for (int i = 0; i < N; i++) {
 
 Esto reduce el número de cálculos de N² a N(N-1)/2 (aproximadamente la mitad).
 
-### 4.5. Condiciones Iniciales
+### 4.5. Estrategia de Paralelización con OpenMP
 
-El programa inicializa los primeros 5 cuerpos con valores fijos para reproducibilidad, y el resto (si N > 5) con valores aleatorios pero con semilla fija (`srand(12345)`).
+La función update_parallel_omp paraleliza el bucle de cálculo de fuerzas, que es el cuello de botella $O(N^2)$, utilizando la directiva principal:
+
+```c
+#pragma omp parallel for private(...) shared(...)
+for (int i = 0; i < N; i++) {
+    // Cálculo de la fuerza neta sobre el cuerpo i
+}
+``` 
+El driver de benchmark (main.cpp) utiliza omp_set_num_threads() y std::chrono para medir el tiempo y calcular las métricas para $P=1, 2, 4, 8$.
 
 ### 4.6. Entrada y Salida
 
-**Entrada (parámetros de línea de comandos):**
-```bash
-./nbody_secuencial [N] [steps] [dt]
-```
-- `N`: Número de cuerpos (default: 5)
-- `steps`: Número de pasos de tiempo (default: 500)
-- `dt`: Tamaño del paso de tiempo (default: 0.001)
+El código actual incluye un ejecutable de benchmark (compilado a partir de `main.cpp`) que ejecuta una versión secuencial seguida de varias ejecuciones paralelas. Por ahora los parámetros de simulación están definidos en `main.cpp` como constantes por defecto:
+
+- `N_BODIES` = 1000
+- `STEPS` = 100
+- `DELTA_T` = 1e-3
 
 **Salida:**
-- Archivo `output.txt`: Posiciones y velocidades finales de todos los cuerpos
-- Consola: Tiempo de ejecución y parámetros de simulación
+- Archivos CSV con estados finales y métricas (ver sección "Archivos generados").
+- Impresiones en consola con tiempos, speedup y eficiencia por cada configuración de hilos.
 
 ---
 
@@ -315,50 +306,170 @@ Tabla de tiempos de ejecución con diferentes tamaños de problema:
 
 ### 5.3. Archivos Generados
 
-```
-output.txt - Estado final del sistema (posiciones y velocidades)
-```
+Al ejecutar el benchmark desde `main.cpp` se generan los siguientes archivos (útiles para análisis y reportes):
 
-Ejemplo de salida:
-```
-Body 0: m=1.000000e+10  x=-0.450123 y=0.049876 z=0.000000  vx=0.000234 vy=0.099845 vz=0.000000
-Body 1: m=1.000000e+10  x=0.550234 y=-0.050123 z=0.000000  vx=-0.000123 vy=-0.100234 vz=0.000000
-...
-```
+- `final_state_sequential.csv`  : estado final (posiciones y velocidades) de la ejecución secuencial
+- `final_state_parallel.csv`    : estado final de la ejecución paralela (guardado para la última configuración paralela)
+- `performance_results.csv`     : CSV con columnas `Threads,Tiempo_Segundos,Speedup,Eficiencia_Porcentaje`
+- `tabla_resultados.md`         : tabla en Markdown con los resultados (lista formateada para documentación)
+
+En el repositorio también hay archivos de ejemplo ya generados para referencia (`final_state_parallel2.csv`, `final_state_sequential2.csv`).
+
+### 5.4. Discusión de la Ley de Amdahl
+
+La **Ley de Amdahl** es un principio fundamental en computación paralela que establece un límite teórico superior en el speedup alcanzable al paralelizar un programa. La ley se expresa matemáticamente como:
+
+$$S(P) = \frac{1}{(1 - f) + \frac{f}{P}}$$
+
+Donde:
+- $S(P)$ es el speedup con $P$ procesadores
+- $f$ es la fracción del código que **no puede ser paralelizada** (secuencial)
+- $P$ es el número de procesadores/threads
+
+**Implicaciones teóricas:**
+
+- **Caso ideal** ($f = 0$): $S(P) = P$ (speedup lineal, 100% de eficiencia)
+- **Caso real** ($f > 0$): El speedup se ve limitado por la fracción secuencial
+- **Limite asintótico**: $\lim_{P \to \infty} S(P) = \frac{1}{f}$ (independiente de P)
+
+Por ejemplo, si $f = 0.05$ (5% secuencial), el máximo speedup posible es $1/0.05 = 20$x, independientemente de cuántos threads se usen.
+
+**Comportamiento observado en nuestros experimentos:**
+
+Con los datos generados (N=1000, STEPS=100):
+
+| Threads | Speedup | Eficiencia | Desviación del ideal |
+|---------|---------|-----------|----------------------|
+| 1 | 1.00x | 100.0% | 0% |
+| 2 | 1.97x | 98.5% | +1.5% (overhead mínimo) |
+| 4 | 3.47x | 86.8% | -13.2% (contención en memoria) |
+| 8 | 4.01x | 50.1% | -49.9% (saturación) |
+
+**Análisis detallado:**
+
+1. **Excelente escalabilidad a P=2:** La eficiencia del 98.5% indica que la fracción secuencial es muy pequeña. El overhead de OpenMP (creación de threads, barreras, sincronización) es casi despreciable.
+
+2. **Degradación notable a P=4 y P=8:** La eficiencia cae a 86.8% y 50.1% respectivamente. Esto sugiere que conforme aumenta el número de threads, factores no ideales comienzan a dominar:
+   - **Contención en memoria compartida:** El acceso a datos compartidos (vector de cuerpos, fuerzas) genera conflictos entre threads.
+   - **False sharing:** Threads escriben en líneas de caché adyacentes, invalidando la caché entre procesadores.
+   - **Overhead de sincronización:** La acumulación de fuerzas requiere mecanismos de reducción (critical sections o atomics) que serializan parcialmente el código.
+
+**Estimación de la fracción secuencial:**
+
+Usando la fórmula de Amdahl con los datos de P=8:
+
+$$4.01 = \frac{1}{(1 - f) + \frac{f}{8}}$$
+
+Despejando $f$:
+
+$$4.01 [(1 - f) + \frac{f}{8}] = 1$$
+$$4.01 - 4.01f + \frac{4.01f}{8} = 1$$
+$$4.01 - 3.01 = 4.01f - \frac{4.01f}{8}$$
+$$3.01 = f(4.01 - 0.50125) = 3.51f$$
+$$f \approx 0.858 \text{ (85.8%)}$$
+
+Este valor parece alto y sugiere que el modelo de Amdahl puro no captura completamente el comportamiento observado. Las razones principales son:
+
+- **Overhead de paralelización:** Crear, sincronizar y destruir threads tiene un costo fijo que es especialmente visible en problemas con cálculos cortos por thread.
+- **Contención y false sharing:** Aumenta más rápido que linealmente con P.
+- **Saturación de ancho de banda:** El cálculo de fuerzas accede intensivamente a memoria compartida; con múltiples threads esto se convierte rápidamente en un cuello de botella.
+
+**Conclusiones para futuras optimizaciones:**
+
+1. **P=2 es óptimo** para este tamaño de problema (N=1000) en hardware típico: alta eficiencia, bajo overhead.
+2. **Para P>4**, se recomienda:
+   - Implementar buffering local de fuerzas por thread para reducir contención.
+   - Usar alineamiento y padding para evitar false sharing.
+   - Considerar algoritmos alternativos (Barnes-Hut) si es necesario escalar a N mucho mayor.
+   - Analizar con herramientas de perfilado (`perf`, `VTune`) para medir exactamente dónde ocurren los cuellos de botella.
+
+3. **Variación según N:** Para problemas más grandes (N >> 1000), el cálculo por thread es mayor, reduciendo el overhead relativo y permitiendo mejor escalabilidad.
 
 ---
 
 ## 6. Conclusiones y Trabajo Futuro
 
-### 6.1. Logros de la Entrega 1
+### 6.1. Logros de la Entrega Final (Semanas 1–3)
 
-En esta primera fase del proyecto se logró:
+**Semana 1 — Implementación Secuencial:**
 
-1. **Implementación completa y funcional** del algoritmo N-Body secuencial
-2. **Validación de la corrección física** de la simulación
-3. **Infraestructura del proyecto** establecida (GitHub, estructura de código)
-4. **Documentación completa** del fundamento teórico y diseño
-5. **Código limpio y bien comentado** siguiendo buenas prácticas
+1. **Implementación completa y funcional** del algoritmo N-Body secuencial en C++
+2. **Validación de corrección física** de la simulación
+3. **Infraestructura del proyecto** establecida (GitHub, estructura de código, CMakeLists.txt)
+4. **Documentación teórica completa** (Ley de Gravitación, método de Euler, parámetro de suavizado)
+5. **Código limpio y bien comentado** con estructura modular (Body, Vector3, NBodySim)
 
-La versión secuencial sirve como:
-- **Baseline** para medir el speedup de la versión paralela
-- **Referencia de corrección** para validar la implementación paralela
-- **Base de código** para la paralelización en las siguientes semanas
+**Semana 2 — Paralelización con OpenMP:**
 
-### 6.2. Trabajo Futuro (Semanas 2 y 3)
+6. **Implementación de `update_parallel_omp()`** con paralelización del cálculo de fuerzas
+7. **Estrategia de reducción de fuerzas** usando buffers privados por thread + reducción crítica
+8. **Identificación de variables compartidas/privadas** y aplicación de cláusulas OpenMP explícitas
+9. **Uso de `#pragma omp parallel for` con `schedule(dynamic)`** para balanceo dinámico de carga
+10. **Verificación funcional** de estados finales guardados en CSV para ambas versiones
+11. **Benchmark driver en `main.cpp`** que ejecuta versiones secuencial y paralela con 1, 2, 4, 8 threads
 
-**Semana 2: Paralelización con OpenMP**
-- Implementar `update_parallel_omp()` con `#pragma omp parallel for`
-- Identificar variables compartidas y privadas
-- Manejar la reducción de fuerzas si es necesario
-- Validar que los resultados sean idénticos a la versión secuencial
+**Semana 3 — Análisis de Rendimiento:**
 
-**Semana 3: Análisis de Rendimiento y Optimización**
-- Medir tiempos con 1, 2, 4, 8, 16 threads
-- Calcular Speedup y Eficiencia
-- Experimentar con cláusulas de schedule (static, dynamic, guided)
-- Analizar resultados en el contexto de la Ley de Amdahl
-- Optimizar acceso a memoria (false sharing, cache locality)
+12. **Medición de tiempos** con múltiples números de threads (1, 2, 4, 8)
+13. **Cálculo de métricas**: Speedup y Eficiencia para cada configuración
+14. **Análisis de la Ley de Amdahl** con estimación cuantitativa de fracción secuencial (~85.8% en P=8)
+15. **Identificación de cuellos de botella**: contención en memoria, false sharing, overhead de sincronización
+16. **Generación de reportes** en CSV (`performance_results.csv`) y Markdown (`tabla_resultados.md`)
+17. **Análisis de escalabilidad** y conclusiones sobre configuración óptima (P=2 alcanza 98.5% de eficiencia)
+
+**Archivos y Entregables:**
+
+- `final_state_sequential.csv` y `final_state_parallel.csv`: estados finales de ambas versiones
+- `performance_results.csv`: métricas cuantitativas (threads, tiempo, speedup, eficiencia)
+- `tabla_resultados.md`: tabla formateada para reportes y documentación
+- `README.md` completo: documentación teórica, diseño, resultados y análisis
+
+### 6.2. Trabajo Completado vs. Trabajo Futuro
+
+**Resumen de Implementación Realizada:**
+
+El proyecto alcanzó un nivel de madurez significativo en las tres semanas. La version paralela está completamente funcional, con mediciones de rendimiento reales y análisis teórico basado en la Ley de Amdahl. El speedup máximo alcanzado fue **4.0x con 8 threads** (eficiencia 50.1%), confirmando que los cuellos de botella principales son contención de memoria y overhead de sincronización más que la fracción secuencial del código.
+
+**Trabajo Futuro (mejoras y extensiones):**
+
+El proyecto estableció una sólida base para futuras optimizaciones:
+
+1. **Optimización de contención en memoria (Corto plazo):**
+   - Implementar alineamiento de datos (padding) para evitar false sharing
+   - Probar reducción con atomics en lugar de `#pragma omp critical`
+   - Reorganizar datos a Structure-of-Arrays (SoA) para mejorar localidad de caché
+   - Experimentar con diferentes `schedule` (static vs guided) y chunk sizes
+
+2. **Escalabilidad a problemas más grandes (Corto plazo):**
+   - Medir escalabilidad con N mucho mayor (10k, 100k cuerpos) donde el overhead relativo disminuye
+   - Implementar pasos de tiempo adaptativos para mejorar eficiencia
+   - Considerar algoritmos alternativos (Barnes-Hut, Fast Multipole) para O(N log N)
+
+3. **Aceleración por GPU (Mediano plazo):**
+   - Portar el núcleo de cálculo de fuerzas a CUDA o OpenCL para obtener speedups mayores
+   - Manejar transferencias de datos GPU↔CPU eficientemente
+   - Verificar precisión numérica en double precision
+
+4. **Distribución en memoria (Mediano plazo):**
+   - Paralelizar con MPI para escalar a clústeres
+   - Combinar MPI + OpenMP (hybrid) para máxima escalabilidad
+   - Implementar decomposición de dominio o decomposición de datos
+
+5. **Integradores numéricos avanzados (Mediano plazo):**
+   - Reemplazar Euler con Verlet/Leapfrog para mejor conservación de energía
+   - Implementar RK de orden superior (RK4, RK8) para mayor precisión
+   - Usar integradores symplecticos para sistemas Hamiltonianos
+
+6. **Robustez y usabilidad (Corto plazo):**
+   - Añadir parsing de argumentos para cambiar N, STEPS, DELTA_T sin recompilar
+   - Soportar archivos de configuración (YAML/JSON)
+   - Implementar pruebas unitarias e integración continua (CI)
+   - Añadir checkpoints para reanudar simulaciones largas
+
+7. **Visualización y análisis (Mediano plazo):**
+   - Exportar trayectorias en formato VTK para visualización 3D
+   - Generar animaciones de la evolución del sistema
+   - Calcular magnitudes conservadas (energía, momento angular) para validación
 
 ---
 
@@ -372,16 +483,23 @@ La versión secuencial sirve como:
 
 ```
 PP_G1_Proy_1_Sim-nbodys/
-├── README.md                    
+├── README.md
+├── CMakeLists.txt
+├── main.cpp
+├── include/
+│   ├── Body.h
+│   ├── NBodySim.h
+│   └── Vector3.h
 ├── src/
-│   ├── nbody_secuencial.c      (Implementación secuencial - Entrega 1)
-│   ├── nbody_parallel.c        (Implementación paralela - Semana 2)
-│   └── Makefile
-├── data/
-│   ├── output.txt              (Salida de la simulación)
-│   └── performance_data.csv    (Datos de rendimiento - Semana 3)
-├── docs/
-│   └── images/                 (Gráficos de speedup - Semana 3)
+│   ├── Body.cpp
+│   ├── NBodySim.cpp
+│   └── Vector3.cpp
+├── final_state_parallel.csv
+├── final_state_parallel2.csv
+├── final_state_sequential.csv
+├── final_state_sequential2.csv
+├── performance_results.csv
+├── tabla_resultados.md
 └── .gitignore
 ```
 
@@ -390,14 +508,37 @@ PP_G1_Proy_1_Sim-nbodys/
 ## Instrucciones de Uso
 
 ### Compilación
+
+Ejemplo usando `g++` y OpenMP (comando que compila `main.cpp` y todos los archivos en `src/`):
+
 ```bash
-gcc -O2 nbody_secuencial.c -o nbody_secuencial -lm
+g++ -O2 -std=c++11 main.cpp src/*.cpp -Iinclude -fopenmp -o simnbody.exe
+```
+
+También puede compilarse con `CMake` aprovechando el `CMakeLists.txt` incluido:
+
+```bash
+mkdir -p build && cd build
+cmake ..
+make -j
+# El ejecutable resultante será algo como `simnbody.exe` según configuración de CMake
 ```
 
 ### Ejecución
+
+Ejecutar el binario generado (no requiere argumentos por defecto):
+
 ```bash
-# Caso pequeño (5 cuerpos, 500 pasos)
-./nbody_secuencial 5 500 0.001
+./simnbody.exe
+```
+
+Comandos útiles para inspeccionar las salidas:
+
+```bash
+cat performance_results.csv
+less tabla_resultados.md
+head -n 10 final_state_sequential.csv
+```
 
 # Caso grande (1000 cuerpos, 100 pasos)
 ./nbody_secuencial 1000 100 0.001
@@ -413,12 +554,12 @@ cat output.txt
 ## Estado del Proyecto
 
 - [x] **Semana 1:** Versión Secuencial 
-- [ ] **Semana 2:** Paralelización con OpenMP
-- [ ] **Semana 3:** Análisis de Rendimiento y Entrega Final
+- [x] **Semana 2:** Paralelización con OpenMP
+- [x] **Semana 3:** Análisis de Rendimiento y Entrega Final
 
 ---
 
-**Última actualización:** [17/11/2025]  
+**Última actualización:** [1/12/2025]  
 **Contacto:** [erick.quispe@unmsm.edu.pe],
               [patrick.coronel@unmsm.edu.pe],
               [fernando.zacarias@unmsm.edu.pe],
