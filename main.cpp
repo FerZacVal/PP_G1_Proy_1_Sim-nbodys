@@ -5,6 +5,8 @@
 #include <vector>
 #include <omp.h>
 #include "NBodySim.h"
+#include <sstream>
+#include <cmath>
 
 // Parámetros Globales
 const int N_BODIES = 1000;
@@ -117,6 +119,95 @@ void save_markdown_table(const std::vector<BenchmarkResult>& results) {
     std::cout << " Tabla Markdown guardada en: tabla_resultados.md\n";
 }
 
+// Trim helper
+static inline std::string trim(const std::string &s) {
+    size_t start = 0;
+    while (start < s.size() && std::isspace((unsigned char)s[start])) start++;
+    size_t end = s.size();
+    while (end > start && std::isspace((unsigned char)s[end - 1])) end--;
+    return s.substr(start, end - start);
+}
+
+bool compare_csv_files(const std::string &file_a, const std::string &file_b) {
+    std::ifstream fa(file_a);
+    std::ifstream fb(file_b);
+    if (!fa.is_open()) {
+        std::cerr << "compare_csv_files: no se pudo abrir " << file_a << "\n";
+        return false;
+    }
+    if (!fb.is_open()) {
+        std::cerr << "compare_csv_files: no se pudo abrir " << file_b << "\n";
+        return false;
+    }
+
+    std::string la, lb;
+    int line_no = 0;
+    const double ABS_EPS = 1e-9;
+    const double REL_EPS = 1e-9;
+
+    while (true) {
+        bool ga = static_cast<bool>(std::getline(fa, la));
+        bool gb = static_cast<bool>(std::getline(fb, lb));
+        if (!ga && !gb) break; // ambos terminaron -> iguales
+        line_no++;
+        if (ga != gb) {
+            std::cerr << "compare_csv_files: diferente número de líneas (línea " << line_no << ")\n";
+            return false;
+        }
+
+        if (la == lb) continue; // línea exactamente igual
+
+        // Tokenizar por comas y comparar campo a campo
+        std::stringstream sa(la);
+        std::stringstream sb(lb);
+        std::string ta, tb;
+        bool field_ok = true;
+        while (std::getline(sa, ta, ',') && std::getline(sb, tb, ',')) {
+            ta = trim(ta);
+            tb = trim(tb);
+            if (ta == tb) continue;
+
+            // Intentar parsear como double en ambos
+            try {
+                size_t ia=0, ib=0;
+                double da = std::stod(ta, &ia);
+                double db = std::stod(tb, &ib);
+
+                // Asegurar que toda la cadena fue consumida (después de trim)
+                if (ia != ta.size() || ib != tb.size()) {
+                    field_ok = false;
+                    break;
+                }
+
+                double diff = std::fabs(da - db);
+                double tol = ABS_EPS + REL_EPS * std::max(std::fabs(da), std::fabs(db));
+                if (!(diff <= tol)) {
+                    field_ok = false;
+                    break;
+                }
+            } catch (...) {
+                // No son numéricos o parse falla -> compararlas como texto
+                if (ta != tb) {
+                    field_ok = false;
+                    break;
+                }
+            }
+        }
+
+        // Si quedaron tokens extra en alguno de los streams, no coinciden
+        if ( (bool)std::getline(sa, ta, ',') || (bool)std::getline(sb, tb, ',') ) {
+            field_ok = false;
+        }
+
+        if (!field_ok) {
+            std::cerr << "compare_csv_files: diferencia en línea " << line_no << ":\n  A: " << la << "\n  B: " << lb << "\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // Función para mostrar análisis de resultados
 void print_analysis(const std::vector<BenchmarkResult>& results) {
     std::cout << "\n";
@@ -192,6 +283,9 @@ int main() {
     NBodySim sim_seq(N_BODIES, DELTA_T, G_CONST);
     sim_seq.initialize_bodies();
 
+    // Capturar el estado inicial para garantizar reproducibilidad
+    std::vector<Body> initial_bodies = sim_seq.get_bodies();
+
     auto start_seq = std::chrono::high_resolution_clock::now();
     sim_seq.update_sequential(STEPS);
     auto end_seq = std::chrono::high_resolution_clock::now();
@@ -231,7 +325,8 @@ int main() {
 
         // Crear nueva simulación
         NBodySim sim_par(N_BODIES, DELTA_T, G_CONST);
-        sim_par.initialize_bodies();
+        // Usar el mismo estado inicial que la versión secuencial
+        sim_par.set_bodies(initial_bodies);
 
         // Medir tiempo
         auto start_par = std::chrono::high_resolution_clock::now();
@@ -275,6 +370,14 @@ int main() {
     // ================================================================
     save_results_csv(results);
     save_markdown_table(results);
+
+    // Verificar que los CSVs finales (secuencial vs paralelo) sean iguales
+    bool csv_equal = compare_csv_files("final_state_sequential.csv", "final_state_parallel.csv");
+    if (csv_equal) {
+        std::cout << "\nVerificacion CSV: Los archivos 'final_state_sequential.csv' y 'final_state_parallel.csv' son IDENTICOS.\n";
+    } else {
+        std::cout << "\nVerificacion CSV: Los archivos difieren. Revisa las salidas.\n";
+    }
 
     std::cout << "\n";
     print_separator();

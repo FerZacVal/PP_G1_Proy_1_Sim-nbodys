@@ -103,6 +103,22 @@ void NBodySim::save_final_state(const std::string& filename) {
     ofs.close();
 }
 
+// Obtener copia del vector de cuerpos (para reproducibilidad)
+std::vector<Body> NBodySim::get_bodies() const {
+    return bodies;
+}
+
+// Establecer cuerpos desde un vector externo. Verifica la consistencia de tamaño.
+void NBodySim::set_bodies(const std::vector<Body>& new_bodies) {
+    if ((int)new_bodies.size() != N_bodies) {
+        std::cerr << "Warning: set_bodies size (" << new_bodies.size()
+                  << ") != N_bodies (" << N_bodies << "). Ignorando.\n";
+        return;
+    }
+
+    bodies = new_bodies;
+}
+
 // Función principal de la simulación paralela con OpenMP
 void NBodySim::update_parallel_omp(int steps) {
 

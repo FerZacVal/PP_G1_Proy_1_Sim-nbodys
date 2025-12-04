@@ -16,6 +16,10 @@ public:
     // Inicialización de cuerpos (Hardcodeado o aleatorio, según el requisito de Input)
     void initialize_bodies();
 
+    // Obtener / establecer estado de cuerpos para reproducibilidad
+    std::vector<Body> get_bodies() const;
+    void set_bodies(const std::vector<Body>& new_bodies);
+
     // Guardar el estado final para verificación [cite: 54]
     void save_final_state(const std::string& filename);
 
